@@ -150,6 +150,34 @@ export function createForm<ControlInterface, FormInterface extends {}>(
     shareReplay({ refCount: true, bufferSize: 1 }),
   );
 
+  const broadcastDefaultValueToParent$: Observable<ControlInterface> = !options.emitInitialValueOnInit
+    ? EMPTY
+    : transformedValue$.pipe(
+        take(1),
+        switchMap(transformedValue => {
+          const transformedValueDelayed$ = of(transformedValue).pipe(
+            delay(0),
+            filter(() => formGroup.valid),
+          );
+
+          if (!isRoot<ControlInterface, FormInterface>(options)) {
+            return transformedValueDelayed$;
+          }
+
+          return of(transformedValue).pipe(
+            filter(formValue =>
+              !options.outputFilterPredicate ? true : options.outputFilterPredicate(transformedValue, formValue),
+            ),
+          );
+        }),
+        map(value =>
+          options.fromFormGroup
+            ? options.fromFormGroup(value)
+            : // if it's not a remap component, the ControlInterface === the FormInterface
+              (value as any as ControlInterface),
+        ),
+      );
+
   const broadcastValueToParent$: Observable<ControlInterface> = transformedValue$.pipe(
     switchMap(transformedValue => {
       if (!isRoot<ControlInterface, FormInterface>(options)) {
@@ -216,6 +244,9 @@ export function createForm<ControlInterface, FormInterface extends {}>(
   const sideEffects = {
     broadcastValueToParent$: registerOnChange$.pipe(
       switchMap(onChange => broadcastValueToParent$.pipe(tap(value => onChange(value)))),
+    ),
+    broadcastDefaultValueToParent$: registerOnChange$.pipe(
+      switchMap(onChange => broadcastDefaultValueToParent$.pipe(tap(value => onChange(value)))),
     ),
     applyUpstreamUpdateOnLocalForm$: transformedValue$.pipe(
       tap(value => {

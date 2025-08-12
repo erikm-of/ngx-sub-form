@@ -45,10 +45,7 @@ export class ListingComponent {
     };
   }
 
-  public listingOutput?: OneListing;
   public upsertListing(listing: OneListing): void {
-    this.listingOutput = listing;
-    console.log('upsertListing', listing);
     this.listingService.upsertListing(listing);
   }
 }
